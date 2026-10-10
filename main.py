@@ -36,6 +36,7 @@ class Game:
         self.font = pygame.font.Font(None, 25)
         self.title_font = pygame.font.Font(None, 40)
         self.head_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        self.head_patches = self.make_head_patches()
         self.connection_paths = self.make_connections()
         self.effects = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         # Cache layered halos; no full-screen blur is needed each frame.
@@ -126,69 +127,58 @@ class Game:
 
     def pulse_connections(self):
         if self.phase == 0:
-            start = (self.jump_count * 2) % len(self.connection_paths)
-            self.active_connections = tuple((start + i * 3) % len(self.connection_paths) for i in range(3))
+            self.active_connections = tuple(self.particle_rng.sample(range(len(self.connection_paths)), 10))
             self.connection_age = 0.0
         self.jump_count += 1
 
-    @staticmethod
-    def make_connections():
-        paths = []
-        for i in range(9):
-            y1 = 280 + i * 22
-            y2 = 280 + ((i * 4 + 2) % 9) * 22
-            # Each connection bends differently between the two face profiles.
-            paths.append([(206, y1), (252, y1 + (i % 3 - 1) * 24),
-                          (348, y2 - (i % 3 - 1) * 24), (394, y2)])
-        return paths
-
-    def draw_phase_background(self, screen):
-        screen.fill(PHASE_COLORS[self.phase])
-        if self.phase != 0:
-            return  # The other two acts are intentionally just color placeholders.
-        layer = self.head_layer
-        layer.fill((0, 0, 0, 0))
-        # Mirrored angular profiles: forehead, nose, lips, chin, and neck.
+    def make_head_patches(self):
+        """Clip a few hundred separated white tiles to each head silhouette."""
         profile = [(98, 530), (105, 462), (76, 420), (62, 350),
                    (74, 281), (105, 240), (160, 233), (195, 254),
                    (206, 298), (211, 320), (228, 347), (212, 356),
                    (216, 374), (207, 384), (213, 397), (207, 425),
                    (181, 448), (170, 484), (184, 530)]
-        for mirrored, color in [(False, CYAN), (True, PINK)]:
-            def point(x, y):
-                return (WIDTH - x if mirrored else x, y)
-            outline = [point(x, y) for x, y in profile]
-            pygame.draw.polygon(layer, (*color, 12), outline)
-            pygame.draw.lines(layer, (*color, 24), True, outline, 9)
-            pygame.draw.lines(layer, (*color, 105), True, outline, 2)
-            # Sparse wireframe facets and a horizontal eye give the shapes a face.
-            for path in [[(76, 350), (133, 316), (195, 254)],
-                         [(133, 316), (157, 396), (181, 448)],
-                         [(76, 420), (157, 396), (207, 425)],
-                         [(105, 462), (170, 484), (98, 530)]]:
-                pygame.draw.lines(layer, (*color, 42), False, [point(x, y) for x, y in path], 1)
-            pygame.draw.line(layer, (*color, 125), point(164, 320), point(196, 320), 2)
-        progress = self.connection_age / CONNECTION_PULSE_SECONDS
-        strength = math.sin(math.pi * progress) ** 0.6
-        for i, path in enumerate(self.connection_paths):
-            pygame.draw.lines(layer, (114, 59, 145, 50), False, path, 1)
-            if i not in self.active_connections or progress >= 1:
-                continue
-            color = CYAN if i % 2 == 0 else PINK
-            pygame.draw.lines(layer, (*color, int(32 * strength)), False, path, 11)
-            pygame.draw.lines(layer, (*color, int(165 * strength)), False, path, 2)
-            # A luminous packet travels along the connection on each bounce.
-            segments = [pygame.Vector2(b) - a for a, b in zip(path, path[1:])]
-            distance = progress * sum(segment.length() for segment in segments)
-            pos = pygame.Vector2(path[-1])
-            for start, segment in zip(path, segments):
-                if distance <= segment.length():
-                    pos = pygame.Vector2(start) + segment.normalize() * distance
-                    break
-                distance -= segment.length()
-            pygame.draw.circle(layer, (*color, int(55 * strength)), pos, 9)
-            pygame.draw.circle(layer, (235, 246, 255, int(230 * strength)), pos, 3)
-        screen.blit(layer, (0, 0))
+        patches = []
+        for mirrored in (False, True):
+            silhouette = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            outline = [(WIDTH - x if mirrored else x, y) for x, y in profile]
+            pygame.draw.polygon(silhouette, (255, 255, 255, 255), outline)
+            mask = pygame.mask.from_surface(silhouette)
+            tiles = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            centers = []
+            # 8x9 patches in 10x10 cells give approximately 72% coverage.
+            # Stagger rows to avoid a rigid checkerboard appearance.
+            for row, y in enumerate(range(230, 530, 10)):
+                for x in range(60 + (row % 2) * 5, 230, 10):
+                    px = WIDTH - x - 8 if mirrored else x
+                    rect = pygame.Rect(px, y, 8, 9)
+                    pygame.draw.rect(tiles, (255, 255, 255, 185), rect)
+                    if mask.get_at(rect.center):
+                        centers.append(rect.center)
+            tiles.blit(silhouette, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            self.head_layer.blit(tiles, (0, 0))
+            patches.append(centers)
+        return patches
+
+    def make_connections(self):
+        rng = random.Random(19)
+        # Endpoints are the centers of actual patches, one on each head.
+        left = rng.sample(self.head_patches[0], 20)
+        right = rng.sample(self.head_patches[1], 20)
+        return list(zip(left, right))
+
+    def draw_phase_background(self, screen):
+        screen.fill(PHASE_COLORS[self.phase])
+        if self.phase != 0:
+            return  # The other two acts are intentionally just color placeholders.
+        screen.blit(self.head_layer, (0, 0))
+        # Immediate bright-white attack, then fade back to the dim white baseline.
+        strength = max(0, 1 - self.connection_age / CONNECTION_PULSE_SECONDS)
+        for i, (start, end) in enumerate(self.connection_paths):
+            brightness = 82
+            if i in self.active_connections:
+                brightness += round(173 * strength)
+            pygame.draw.line(screen, (brightness,) * 3, start, end, 1)
 
     def text(self, surface, message, position, color=(238, 245, 230), large=False):
         font = self.title_font if large else self.font
