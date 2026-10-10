@@ -13,7 +13,10 @@ LEVEL_STEPS = 40
 PLATFORM_GAP = 95
 CYAN = (65, 239, 255)
 PINK = (255, 77, 192)
-BPM = 120
+# Height thresholds for the three acts of the climb.
+PHASE_HEIGHTS = (0, 1300, 2600)
+PHASE_COLORS = ((15, 8, 32), (12, 30, 46), (38, 12, 36))
+CONNECTION_PULSE_SECONDS = 0.7
 
 
 def make_level():
@@ -32,10 +35,8 @@ class Game:
     def __init__(self):
         self.font = pygame.font.Font(None, 25)
         self.title_font = pygame.font.Font(None, 40)
-        self.background = pygame.Surface((WIDTH, HEIGHT))
-        for y in range(HEIGHT):
-            shade = math.sin(y / HEIGHT * math.pi)
-            pygame.draw.line(self.background, (12 + int(12 * shade), 8, 28 + int(21 * shade)), (0, y), (WIDTH, y))
+        self.head_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        self.connection_paths = self.make_connections()
         self.effects = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         # Cache layered halos; no full-screen blur is needed each frame.
         self.platform_glows = {}
@@ -65,10 +66,15 @@ class Game:
         self.particles = []
         self.landing_pulses = []
         self.particle_rng = random.Random()
+        self.jump_count = 0
+        self.connection_age = CONNECTION_PULSE_SECONDS
+        self.active_connections = ()
+        self.pulse_connections()  # The initial launch is a jump too.
 
 
     def update(self, dt, direction):
         self.elapsed += dt
+        self.connection_age = min(CONNECTION_PULSE_SECONDS, self.connection_age + dt)
         for particle in self.particles:
             particle[0] += particle[2] * dt
             particle[1] += particle[3] * dt
@@ -94,6 +100,7 @@ class Game:
                         and self.player.left < platform.right):
                     self.player.bottom = platform.top
                     self.velocity.y = -JUMP_SPEED
+                    self.pulse_connections()
                     self.landing_pulses.append((self.player.centerx, platform.top, 0))
                     for _ in range(18):
                         self.particles.append([self.player.centerx, platform.top,
@@ -112,35 +119,83 @@ class Game:
         if self.player.top - self.camera > HEIGHT:
             self.dead = True
 
+    @property
+    def phase(self):
+        # Use the best height of this run so falling never reverses an act.
+        return sum(self.height >= threshold for threshold in PHASE_HEIGHTS[1:])
+
+    def pulse_connections(self):
+        if self.phase == 0:
+            start = (self.jump_count * 2) % len(self.connection_paths)
+            self.active_connections = tuple((start + i * 3) % len(self.connection_paths) for i in range(3))
+            self.connection_age = 0.0
+        self.jump_count += 1
+
+    @staticmethod
+    def make_connections():
+        paths = []
+        for i in range(9):
+            y1 = 280 + i * 22
+            y2 = 280 + ((i * 4 + 2) % 9) * 22
+            # Each connection bends differently between the two face profiles.
+            paths.append([(206, y1), (252, y1 + (i % 3 - 1) * 24),
+                          (348, y2 - (i % 3 - 1) * 24), (394, y2)])
+        return paths
+
+    def draw_phase_background(self, screen):
+        screen.fill(PHASE_COLORS[self.phase])
+        if self.phase != 0:
+            return  # The other two acts are intentionally just color placeholders.
+        layer = self.head_layer
+        layer.fill((0, 0, 0, 0))
+        # Mirrored angular profiles: forehead, nose, lips, chin, and neck.
+        profile = [(98, 530), (105, 462), (76, 420), (62, 350),
+                   (74, 281), (105, 240), (160, 233), (195, 254),
+                   (206, 298), (211, 320), (228, 347), (212, 356),
+                   (216, 374), (207, 384), (213, 397), (207, 425),
+                   (181, 448), (170, 484), (184, 530)]
+        for mirrored, color in [(False, CYAN), (True, PINK)]:
+            def point(x, y):
+                return (WIDTH - x if mirrored else x, y)
+            outline = [point(x, y) for x, y in profile]
+            pygame.draw.polygon(layer, (*color, 12), outline)
+            pygame.draw.lines(layer, (*color, 24), True, outline, 9)
+            pygame.draw.lines(layer, (*color, 105), True, outline, 2)
+            # Sparse wireframe facets and a horizontal eye give the shapes a face.
+            for path in [[(76, 350), (133, 316), (195, 254)],
+                         [(133, 316), (157, 396), (181, 448)],
+                         [(76, 420), (157, 396), (207, 425)],
+                         [(105, 462), (170, 484), (98, 530)]]:
+                pygame.draw.lines(layer, (*color, 42), False, [point(x, y) for x, y in path], 1)
+            pygame.draw.line(layer, (*color, 125), point(164, 320), point(196, 320), 2)
+        progress = self.connection_age / CONNECTION_PULSE_SECONDS
+        strength = math.sin(math.pi * progress) ** 0.6
+        for i, path in enumerate(self.connection_paths):
+            pygame.draw.lines(layer, (114, 59, 145, 50), False, path, 1)
+            if i not in self.active_connections or progress >= 1:
+                continue
+            color = CYAN if i % 2 == 0 else PINK
+            pygame.draw.lines(layer, (*color, int(32 * strength)), False, path, 11)
+            pygame.draw.lines(layer, (*color, int(165 * strength)), False, path, 2)
+            # A luminous packet travels along the connection on each bounce.
+            segments = [pygame.Vector2(b) - a for a, b in zip(path, path[1:])]
+            distance = progress * sum(segment.length() for segment in segments)
+            pos = pygame.Vector2(path[-1])
+            for start, segment in zip(path, segments):
+                if distance <= segment.length():
+                    pos = pygame.Vector2(start) + segment.normalize() * distance
+                    break
+                distance -= segment.length()
+            pygame.draw.circle(layer, (*color, int(55 * strength)), pos, 9)
+            pygame.draw.circle(layer, (235, 246, 255, int(230 * strength)), pos, 3)
+        screen.blit(layer, (0, 0))
+
     def text(self, surface, message, position, color=(238, 245, 230), large=False):
         font = self.title_font if large else self.font
         surface.blit(font.render(message, True, color), position)
 
     def draw(self, screen):
-        screen.blit(self.background, (0, 0))
-        beat = (math.sin(self.elapsed * math.tau * BPM / 60) + 1) / 2
-        horizon = 265
-        # Perspective laser floor with smoothly advancing depth lines.
-        grid_color = (48 + int(beat * 12), 20, 80 + int(beat * 18))
-        for end_x in range(-WIDTH * 2, WIDTH * 3 + 1, 120):
-            pygame.draw.line(screen, grid_color, (WIDTH // 2, horizon), (end_x, HEIGHT))
-        drift = (self.elapsed * 0.22 - self.camera * 0.0006) % 1
-        for i in range(18):
-            depth = ((i + drift) / 18) ** 2
-            y = horizon + depth * (HEIGHT - horizon)
-            pygame.draw.line(screen, grid_color, (0, y), (WIDTH, y))
-        pygame.draw.line(screen, (83, 28, 116), (0, horizon), (WIDTH, horizon))
-        # Broken rings rotate at different speeds, behind the playfield.
-        for i, (cx, cy, radius) in enumerate([(300, 220, 115), (100, 485, 75), (510, 590, 100)]):
-            cy += math.sin(self.elapsed * 0.4 + i) * 18
-            bounds = pygame.Rect(cx - radius, cy - radius, radius * 2, radius * 2)
-            angle = self.elapsed * (0.22 if i % 2 == 0 else -0.18) + i
-            for segment in range(3):
-                start = angle + segment * math.tau / 3
-                pygame.draw.arc(screen, (79, 32, 112), bounds, start, start + 1.4, 2)
-                x = cx + math.cos(start) * radius
-                y = cy - math.sin(start) * radius
-                pygame.draw.circle(screen, (125, 47, 151), (round(x), round(y)), 3)
+        self.draw_phase_background(screen)
         for platform in self.platforms:
             y = round(platform.y - self.camera)
             if y < -30 or y > HEIGHT:
@@ -189,7 +244,7 @@ class Game:
         pygame.draw.rect(screen, (72, 44, 106), (16, 16, WIDTH - 32, 105), width=1, border_radius=12)
         self.text(screen, 'NEON LEAP', (32, 27), large=True)
         self.text(screen, f'Height  {self.height}   /   {LEVEL_STEPS * PLATFORM_GAP}', (275, 34))
-        self.text(screen, f'Shards  {self.total_coins - len(self.coins)} / {self.total_coins}     Best  {self.best}', (32, 68))
+        self.text(screen, f'Shards  {self.total_coins - len(self.coins)} / {self.total_coins}     Phase {self.phase + 1}/3', (32, 68))
         self.text(screen, 'A/D or arrows steer  •  Auto jump  •  R restart', (32, 94))
         if self.won or self.dead:
             pygame.draw.rect(screen, (14, 12, 32), (70, 270, WIDTH - 140, 180), border_radius=18)
