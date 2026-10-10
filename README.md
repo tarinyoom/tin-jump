@@ -1,6 +1,6 @@
-# Little Leap
+# Neon Leap
 
-A pygame-ce vertical jumper inspired by Doodle Jump. Bounce up a route of 40 platforms to reach the summit flag, collecting coins along the way. All artwork is drawn in code.
+A pygame-ce vertical jumper inspired by Doodle Jump. Bounce up a route of 40 platforms to reach the summit flag, collecting energy shards along the way. Cyan platforms glow against a purple perspective laser grid, rotating rings, and pink landing bursts. Background animation follows a simulated 120 BPM pulse; no music or external assets are required. All artwork is drawn in code.
 
 ## Run
 
