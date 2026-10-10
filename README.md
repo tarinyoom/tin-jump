@@ -1,6 +1,6 @@
 # Little Leap
 
-A tiny pygame-ce side-scroller with grassy platforms, coins, a checkpoint, and a finish flag. All artwork is drawn in code, so no assets are needed.
+A pygame-ce vertical jumper inspired by Doodle Jump. Bounce up a route of 40 platforms to reach the summit flag, collecting coins along the way. All artwork is drawn in code.
 
 ## Run
 
@@ -13,6 +13,6 @@ python main.py
 
 On Windows, activate with `.venv\Scripts\activate` instead.
 
-Move with **A/D** or **Left/Right**. Jump with **Space**, **W**, or **Up**; release early for a shorter jump. **R** restarts and **Escape** quits. Reach the flag, collecting coins along the way. Falling respawns you at the latest checkpoint.
+Steer with **A/D** or **Left/Right**. Jumping is automatic whenever you land. Platforms allow you to jump through them from below, and the screen wraps horizontally. The camera follows your climb; falling below the screen ends the run. **R** restarts and **Escape** quits. Your best height is kept for the current session.
 
-Edit `PLATFORM_LAYOUT` in `main.py` to change the level. Physics and window settings are near the top of that file. Uses the standard [pygame-ce API](https://pyga.me/docs/).
+Edit `make_level()` to change the platform route. `LEVEL_STEPS`, `PLATFORM_GAP`, and the physics settings are near the top of `main.py`.
