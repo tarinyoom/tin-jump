@@ -1,6 +1,6 @@
 # Neon Leap
 
-A pygame-ce vertical jumper inspired by Doodle Jump. Bounce up a route of 40 platforms to reach the summit flag, collecting energy shards along the way. Cyan platforms glow through three altitude-based visual acts: two facing wireframe heads with jump-triggered pulsing connections below height 1300, a blue color placeholder from 1300, and a plum color placeholder from 2600. Each bounce activates a different set of connections, with light packets traveling between the heads. Phases follow the maximum height of the current run and reset when you restart. No music or external assets are required. All artwork is drawn in code.
+A pygame-ce vertical jumper inspired by Doodle Jump. Bounce up a route of 40 platforms to reach the summit flag, collecting energy shards along the way. Cyan platforms glow through three altitude-based visual acts: two facing white patch-mosaic heads with jump-triggered pulsing connections below height 1300, a blue color placeholder from 1300, and a plum color placeholder from 2600. Each head has a few hundred white patches covering approximately 70% of its silhouette. Twenty straight white lines connect patch centers; each bounce randomly highlights ten lines in brighter white, fading back to the baseline. Phases follow the maximum height of the current run and reset when you restart. No music or external assets are required. All artwork is drawn in code.
 
 ## Run
 
