@@ -1,0 +1,81 @@
+name: Publish to itch.io
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-itch
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ITCH_TARGET: ${{ vars.ITCH_TARGET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Check publishing configuration
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          test -n "$ITCH_TARGET" || { echo 'Set the ITCH_TARGET repository variable to username/game-slug.'; exit 1; }
+          test -n "$BUTLER_API_KEY" || { echo 'Set the BUTLER_API_KEY repository secret.'; exit 1; }
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Build browser archive
+        run: python -m pygbag --archive .
+
+      - name: Verify browser archive
+        run: |
+          python - <<'PY'
+          import io
+          import zipfile
+
+          with zipfile.ZipFile('build/web.zip') as archive:
+              assert archive.testzip() is None, 'Corrupt web archive'
+              assert 'index.html' in archive.namelist(), 'Missing index.html at ZIP root'
+              packages = [name for name in archive.namelist() if name.endswith('.apk')]
+              assert len(packages) == 1, 'Expected one game package'
+              with zipfile.ZipFile(io.BytesIO(archive.read(packages[0]))) as game:
+                  assert 'assets/main.py' in game.namelist(), 'Missing game entry point'
+                  assert all('.venv' not in name.split('/') for name in game.namelist()), 'Packaged local virtual environment'
+          print('Browser archive verified.')
+          PY
+
+      - name: Save browser build
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-leap-web
+          path: build/web.zip
+          if-no-files-found: error
+
+      - name: Install Butler
+        run: |
+          curl --fail --location --retry 3 \
+            https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default \
+            --output "$RUNNER_TEMP/butler.zip"
+          unzip -q "$RUNNER_TEMP/butler.zip" -d "$RUNNER_TEMP/butler"
+          chmod +x "$RUNNER_TEMP/butler/butler"
+          "$RUNNER_TEMP/butler/butler" version
+
+      - name: Upload to itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          "$RUNNER_TEMP/butler/butler" push build/web.zip "$ITCH_TARGET:html5" \
+            --userversion "$GITHUB_REF_NAME-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
