@@ -13,6 +13,20 @@ python main.py
 
 On Windows, activate with `.venv\Scripts\activate` instead.
 
+## Run in a browser
+
+After installing the dependencies above, run this from the project folder with the virtual environment activated:
+
+```bash
+python -m pygbag .
+```
+
+Open **http://localhost:8000**, wait for loading to finish, and click the game to start. The first load may take longer while the browser downloads the Python and pygame runtime. Keep the terminal running while playing; press **Ctrl+C** to stop the server. Restart the server after changing the game code.
+
+`pygbag.ini` defines which project files and folders to exclude from the game package, including `.venv`, development files, and plans. Commit this configuration so everyone builds with the same exclusions. Generated files under `build/` are ignored by Git.
+
+## Controls and customization
+
 Steer with **A/D** or **Left/Right**. Jumping is automatic whenever you land. Platforms allow you to jump through them from below, and the screen wraps horizontally. The camera follows your climb; falling below the screen ends the run. **R** restarts and **Escape** quits. Your best height is kept for the current session.
 
 Edit `make_level()` to change the platform route. `LEVEL_STEPS`, `PLATFORM_GAP`, and the physics settings are near the top of `main.py`.

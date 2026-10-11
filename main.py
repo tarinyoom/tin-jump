@@ -1,5 +1,6 @@
 """Little Leap: a vertical auto-jumper. Run with python main.py."""
 
+import asyncio
 import math
 import random
 
@@ -243,7 +244,7 @@ class Game:
             self.text(screen, 'Press R to try again', (205, 405))
 
 
-def main():
+async def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption('Neon Leap — Vertical Jumper')
@@ -268,8 +269,9 @@ def main():
             accumulator -= STEP
         game.draw(screen)
         pygame.display.flip()
+        await asyncio.sleep(0)
     pygame.quit()
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
