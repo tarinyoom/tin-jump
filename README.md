@@ -1,6 +1,14 @@
-# Neon Leap
+# Tin Jump
 
-A pygame-ce vertical jumper inspired by Doodle Jump. Bounce up a route of 40 platforms to reach the summit flag, collecting energy shards along the way. Cyan platforms glow through three altitude-based visual acts: two facing white patch-mosaic heads with jump-triggered pulsing connections below height 1300, a blue color placeholder from 1300, and a plum color placeholder from 2600. Each head has a few hundred white patches covering approximately 70% of its silhouette. Twenty straight white lines connect patch centers; each bounce randomly highlights ten lines in brighter white, fading back to the baseline. Phases follow the maximum height of the current run and reset when you restart. No music or external assets are required. All artwork is drawn in code.
+Tin Jump is a pygame-ce vertical jumper inspired by the Tinlicker concert I attended on October 9, 2026, at the Wiltern Theater. It brings that inspiration into a climb through glowing platforms, pulsing connections, and changing colors, with jumping mechanics inspired by Doodle Jump.
+
+Bounce up a route of 40 platforms to reach the summit flag, collecting energy shards along the way. The visuals unfold in three acts as you climb:
+
+- Below height 1300, two facing heads made of white mosaic patches are linked by lines that pulse with each jump.
+- From height 1300, the backdrop shifts to a blue color placeholder.
+- From height 2600, it shifts to a plum color placeholder.
+
+Visual acts follow the maximum height of your current run and reset when you restart. All artwork is drawn in code; the game currently has no music or external assets.
 
 ## Run
 
@@ -31,7 +39,7 @@ The `Publish to itch.io` workflow builds with the dependencies in `requirements.
 
 Configure the following under the GitHub repository's **Settings → Secrets and variables → Actions**:
 
-- Repository variable `ITCH_TARGET`: your itch.io username and project slug, such as `yourname/neon-leap`.
+- Repository variable `ITCH_TARGET`: your itch.io username and project slug, such as `yourname/tin-jump`.
 - Repository secret `BUTLER_API_KEY`: your Butler authentication key. Run `butler login` locally, then obtain the key from the itch.io [API keys settings](https://itch.io/user/settings/api-keys) with source `wharf`. See [Butler CI authentication](https://itch.io/docs/butler/login.html).
 
 Create the itch.io project before running the workflow and choose **HTML** as its kind. After the first upload, edit the project and mark the `html5` upload as **This file will be played in the browser**. Butler requires this one-time setting on the site; see [Butler browser uploads](https://itch.io/docs/butler/pushing.html#html-playable-in-browser-games).
